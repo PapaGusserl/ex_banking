@@ -1,5 +1,6 @@
 defmodule ExBanking.UserManager do
   use Supervisor
+  @moduledoc "Module supervises User's profiles"
 
   def start_link(_) do
     Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -10,12 +11,14 @@ defmodule ExBanking.UserManager do
     supervise([], opts)
   end
 
+  @doc "Create user"
   @spec create(user :: String.t()) :: :ok
   def create(user) do
     {:ok, _} = Supervisor.start_child(__MODULE__, user_spec(user))
     :ok
   end
 
+  @doc "Checks user's existing"
   @spec exists?(user :: String.t()) :: boolean
   def exists?(user) do
     __MODULE__
@@ -23,6 +26,7 @@ defmodule ExBanking.UserManager do
     |> Enum.any?(fn {id, _, _, _} -> id == user end)
   end
 
+  @doc "Return user's pid"
   @spec get_pid(user :: String.t()) :: {:ok, pid} | {:error, :id_not_exist}
   def get_pid(user) do
     __MODULE__

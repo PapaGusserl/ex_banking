@@ -21,10 +21,10 @@ defmodule ExBanking do
   """
   @spec create_user(user :: String.t()) :: :ok | banking_error
   def create_user(user) when is_binary(user) do
-    with {:user_exists, false} <- {:user_exists, UserManager.exists?(user)} do
-      UserManager.create(user)
+    if UserManager.exists?(user) do
+      :user_already_exists
     else
-      {:user_exists, true} -> :user_already_exists
+      UserManager.create(user)
     end
   end
   def create_user(_), do: :wrong_arguments
@@ -81,10 +81,9 @@ defmodule ExBanking do
   defp request(oper, user, amount, currency)
     when is_binary(user) and is_binary(currency) and is_number(amount) and amount >= 0
   do
-    with {:ok, pid} <- UserManager.get_pid(user) do
-      User.transaction(pid, {oper, [amount, currency]})
-    else
-      {:error, _} -> :user_does_not_exist
+    case UserManager.get_pid(user) do
+      {:ok, pid} -> User.transaction(pid, {oper, [amount, currency]})
+      _else -> :user_does_not_exist
     end
   end
 

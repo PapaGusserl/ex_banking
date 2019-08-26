@@ -1,9 +1,12 @@
 defmodule ExBanking.User do
   use GenServer
+  @moduledoc "Module implements logic with money amounts"
   # providing 2 decimal precision of money amount for any currency
   @decimals 2
   @message_box_size 10
 
+  @spec transaction(user_pid :: pid, {operation :: atom, args :: [any]}) ::
+        result :: atom | {:ok, any} | {:ok, any, any}
   def transaction(pid, {oper, args}) do
     {:message_queue_len, message_box} = :erlang.process_info(pid, :message_queue_len)
     if message_box < @message_box_size do

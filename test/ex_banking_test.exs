@@ -1,6 +1,6 @@
 defmodule ExBankingTest do
   use ExUnit.Case
-  doctest ExBanking
+  require Logger
 
   setup_all do
     %{
@@ -17,7 +17,7 @@ defmodule ExBankingTest do
 
   setup context do
     Application.start(:ex_banking)
-    require Logger; Logger.info("Application :ex_banking started")
+    Logger.info("Application :ex_banking started")
     :ok = ExBanking.create_user(context.user1.id)
     :ok = ExBanking.create_user(context.user2.id)
     :ok = ExBanking.create_user(context.user3.id)
@@ -184,7 +184,6 @@ defmodule ExBankingTest do
 
     @tag :too_many_requests
     test ": want to send more than 10 requests to reciever", cnt do
-      # TODO: нагрузить большим кол-вом сообщений
       make_too_many_requests_to(cnt.user2.id)
       assert :too_many_requests_to_receiver ==
                ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1], cnt.cur1)
@@ -233,6 +232,13 @@ defmodule ExBankingTest do
       {:ok, new_balance1, new_balance2} = ExBanking.send(user1.id, user2.id, 12.776335, cur)
       assert Float.round(actual_balance1 - 11.30 + 10.33 - 12.14 + 10.74 - 12.78, 2) == new_balance1
       assert Float.round(actual_balance2 + 11.30 - 10.33 + 12.14 - 10.74 + 12.78, 2) == new_balance2
+    end
+  end
+
+  describe "Other" do
+    test ":send stange requests", %{user2: user} do
+      {:ok, pid} = ExBanking.UserManager.get_pid(user.id)
+      nil = GenServer.call(pid, :stranger)
     end
   end
 
