@@ -16,7 +16,8 @@ defmodule ExBankingTest do
   end
 
   setup context do
-    ExBanking.Application.start()
+    Application.start(:ex_banking)
+    require Logger; Logger.info("Application :ex_banking started")
     :ok = ExBanking.create_user(context.user1.id)
     :ok = ExBanking.create_user(context.user2.id)
     :ok = ExBanking.create_user(context.user3.id)
@@ -24,14 +25,14 @@ defmodule ExBankingTest do
     context
 
     on_exit(fn ->
-      ExBanking.Application.stop()
+      Application.stop(:ex_banking)
     end)
   end
 
   setup %{user1: user1, user2: user2, cur1: cur1, cur2: cur2, cur3: cur3} = context do
     {:ok, balance1} = ExBanking.deposit(user1.id, 1000, cur1)
-    {:ok, balance2} = ExBanking.deposit(user1.id, 10, cur2)
-    {:ok, balance3} = ExBanking.deposit(user1.id, 1, cur3)
+    {:ok, balance2} = ExBanking.deposit(user1.id, 100, cur2)
+    {:ok, balance3} = ExBanking.deposit(user1.id, 10, cur3)
 
     {:ok, balance4} = ExBanking.deposit(user2.id, 99, cur2)
 
@@ -55,9 +56,12 @@ defmodule ExBankingTest do
   end
 
   describe "increasing user's balance" do
-    test ": want to send more than 10 requests to user", cnt do
-      # TODO: нагрузить большим кол-вом сообщений
-      assert :too_many_requests_to_user == ExBanking.deposit(cnt.user1, 1000, cnt.cur1)
+    @tag :too_many_requests
+    test ": want to send more than 10 requests to user", %{user1: user} = cnt do
+      make_too_many_requests_to(user.id)
+      assert :too_many_requests_to_user == ExBanking.deposit(user.id, 1000, cnt.cur1)
+      :timer.sleep(5000) # за это время все таски должны быть завершены
+      assert {:ok, _} = ExBanking.deposit(user.id, 1000, cnt.cur1)
     end
 
     test ": want to increase on negative amount", cnt do
@@ -70,13 +74,13 @@ defmodule ExBankingTest do
 
     test ": user and USER are not the same person", cnt do
       assert :user_does_not_exist =
-               ExBanking.deposit(String.uppercase(cnt.user1.id), 1000, cnt.cur1)
+               ExBanking.deposit(String.upcase(cnt.user1.id), 1000, cnt.cur1)
     end
 
     test ": balance depends on currency", %{user1: user, cur1: cur1, cur2: cur2, cur3: cur3} do
-      assert {:ok, user[:balance][cur1] + 1000} = ExBanking.deposit(user.id, 1000, cur1)
-      assert {:ok, user[:balance][cur2] + 1000} = ExBanking.deposit(user.id, 1000, cur2)
-      assert {:ok, user[:balance][cur3] + 1000} = ExBanking.deposit(user.id, 1000, cur3)
+      assert {:ok, user[:balance][cur1] + 1000} == ExBanking.deposit(user.id, 1000, cur1)
+      assert {:ok, user[:balance][cur2] + 1000} == ExBanking.deposit(user.id, 1000, cur2)
+      assert {:ok, user[:balance][cur3] + 1000} == ExBanking.deposit(user.id, 1000, cur3)
     end
 
     test ": balance would be increased", %{user1: user, cur1: cur} do
@@ -98,31 +102,41 @@ defmodule ExBankingTest do
       assert {:ok, user2[:balance][cur] + 1} == ExBanking.deposit(user2.id, 1, cur)
       assert {:ok, user1[:balance][cur] + 1000} == ExBanking.deposit(user1.id, 1000, cur)
     end
+
+    test ": providing 2 decimals", %{user1: user, cur3: cur} do
+      actual_balance = user[:balance][cur] || 0
+      ExBanking.deposit(user.id, 11.3, cur)
+      ExBanking.deposit(user.id, 11.3333333333, cur)
+      ExBanking.deposit(user.id, 11.143333, cur)
+      ExBanking.deposit(user.id, 11.743333, cur)
+      assert {:ok, actual_balance + 11.30 + 11.33 + 11.14 + 11.74 + 11.78} == ExBanking.deposit(user.id, 11.776336, cur)
+    end
   end
 
   describe "decreasing user's balance" do
-    test ": want to send more than 10 requests to user", cnt do
-      # TODO: нагрузить большим кол-вом сообщений
-      assert :too_many_requests_to_user == ExBanking.withdraw(cnt.user1, 1000, cnt.cur1)
+    @tag :too_many_requests
+    test ": want to send more than 10 requests to user", %{user1: user} = cnt do
+      make_too_many_requests_to(user.id)
+      assert :too_many_requests_to_user == ExBanking.withdraw(user.id, 1000, cnt.cur1)
     end
 
     test ": want to decrease on negative amount", cnt do
-      assert :wrong_arguments == ExBanking.withdraw(cnt.user1, -1000, cnt.cur1)
+      assert :wrong_arguments == ExBanking.withdraw(cnt.user1.id, -1000, cnt.cur1)
     end
 
     test ": want to decrease amount not existing user", cnt do
-      assert :user_does_not_exist == ExBanking.withdraw(cnt.user5, 1000, cnt.cur1)
+      assert :user_does_not_exist == ExBanking.withdraw(cnt.user5.id, 1000, cnt.cur1)
     end
 
     test ": user and USER are not the same person", cnt do
       assert :user_does_not_exist ==
-               ExBanking.withdraw(String.uppercase(cnt.user1), 1000, cnt.cur1)
+               ExBanking.withdraw(String.upcase(cnt.user1.id), 1000, cnt.cur1)
     end
 
     test ": balance depends on currency", %{user1: user, cur1: cur1, cur2: cur2, cur3: cur3} do
-      assert {:ok, user[:balance][cur1] - 1000} = ExBanking.withdraw(user.id, 1000, cur1)
-      assert {:ok, user[:balance][cur2] - 100} = ExBanking.withdraw(user.id, 100, cur2)
-      assert {:ok, user[:balance][cur3] - 10} = ExBanking.withdraw(user.id, 10, cur3)
+      assert {:ok, user[:balance][cur1] - 1000} == ExBanking.withdraw(user.id, 1000, cur1)
+      assert {:ok, user[:balance][cur2] - 100} == ExBanking.withdraw(user.id, 100, cur2)
+      assert {:ok, user[:balance][cur3] - 10} == ExBanking.withdraw(user.id, 10, cur3)
     end
 
     test ": balance would be decreased", %{user1: user, cur1: cur} do
@@ -142,59 +156,90 @@ defmodule ExBankingTest do
       cur2: cur
     } do
       assert {:ok, user2[:balance][cur] - 1} == ExBanking.withdraw(user2.id, 1, cur)
-      assert {:ok, user1[:balance][cur] - 1000} == ExBanking.withdraw(user1.id, 1000, cur)
+      assert {:ok, user1[:balance][cur] - 10} == ExBanking.withdraw(user1.id, 10, cur)
     end
 
     test ": max decreasing equal balance", %{user1: user, cur1: cur} do
       assert {:ok, 0} == ExBanking.withdraw(user.id, user[:balance][cur], cur)
       assert :not_enough_money == ExBanking.withdraw(user.id, user[:balance][cur], cur)
     end
+
+    test ": providing 2 decimals", %{user1: user, cur1: cur} do
+      actual_balance = user[:balance][cur]
+      ExBanking.withdraw(user.id, 11.3, cur)
+      ExBanking.withdraw(user.id, 11.3333333333, cur)
+      ExBanking.withdraw(user.id, 11.143333, cur)
+      ExBanking.withdraw(user.id, 11.743333, cur)
+      assert {:ok, actual_balance - 11.30 - 11.33 - 11.14 - 11.74 - 11.78} == ExBanking.withdraw(user.id, 11.776336, cur)
+    end
   end
 
   describe "sending user's money" do
-    test ": want to send more than 10 requests from one user", cnt do
-      # TODO: нагрузить большим кол-вом сообщений
+    @tag :too_many_requests
+    test ": want to send more than 10 requests to sender", cnt do
+      make_too_many_requests_to(cnt.user1.id)
       assert :too_many_requests_to_sender ==
-               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1] || 1, cur1)
+               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1], cnt.cur1)
     end
 
-    test ": want to send more than 10 requests to one user", cnt do
+    @tag :too_many_requests
+    test ": want to send more than 10 requests to reciever", cnt do
       # TODO: нагрузить большим кол-вом сообщений
-      assert :too_many_requests_to_reciever ==
-               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1] || 1, cur1)
+      make_too_many_requests_to(cnt.user2.id)
+      assert :too_many_requests_to_receiver ==
+               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1], cnt.cur1)
     end
 
     test ": want to send more amount then you have", cnt do
       assert :not_enough_money ==
-               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1] || 1, cur1)
+               ExBanking.send(cnt.user1.id, cnt.user2.id, cnt.user1.balance[cnt.cur1] + 1, cnt.cur1)
     end
 
     test ": want to send negative amount", cnt do
-      assert :wrong_arguments == ExBanking.send(cnt.user1.id, cnt.user2.id, -1, cur1)
+      assert :wrong_arguments == ExBanking.send(cnt.user1.id, cnt.user2.id, -1, cnt.cur1)
     end
 
     test ": want to send amount from not existing user to existing user", cnt do
-      assert :user_does_not_exist == ExBanking.send(cnt.user5.id, cnt.user2.id, 1, cur1)
+      assert :user_does_not_exist == ExBanking.send(cnt.user5.id, cnt.user2.id, 1, cnt.cur1)
     end
 
     test ": want to send amount from existing user to not existing user", cnt do
-      assert :user_does_not_exist == ExBanking.send(cnt.user1.id, cnt.user5.id, 1, cur1)
+      assert :user_does_not_exist == ExBanking.send(cnt.user1.id, cnt.user5.id, 1, cnt.cur1)
     end
 
     test ": user and USER are not the same person", cnt do
       assert :user_does_not_exist ==
-               ExBanking.send(cnt.user1.id, String.uppercase(cnt.user2.id), 1, cur1)
+               ExBanking.send(cnt.user1.id, String.upcase(cnt.user2.id), 1, cnt.cur1)
     end
 
     test ": to existing user", cnt do
-      assert {:ok, cnt.user1.balance[cur1] - 1, cnt.user2.balance[cur1] || 1} ==
-               ExBanking.send(cnt.user1.id, cnt.user2.id, 1, cur1)
+      assert {:ok, cnt.user1.balance[cnt.cur1] - 1, cnt.user2.balance[cnt.cur1] || 1} ==
+               ExBanking.send(cnt.user1.id, cnt.user2.id, 1, cnt.cur1)
     end
 
     test ": balances are changed", cnt do
-      assert {:ok, _, _} = ExBanking.send(cnt.user1.id, cnt.user2.id, 1, cur1)
-      assert {:ok, cnt.user1.balance[cur1] || 0} == ExBanking.get_balance(cnt.user1.id, cur1)
-      assert {:ok, cnt.user2.balance[cur1] || 1} == ExBanking.get_balance(cnt.user2.id, cur1)
+      assert {:ok, _, _} = ExBanking.send(cnt.user1.id, cnt.user2.id, 1, cnt.cur1)
+      assert {:ok, cnt.user1.balance[cnt.cur1] - 1} == ExBanking.get_balance(cnt.user1.id, cnt.cur1)
+      assert {:ok, cnt.user2.balance[cnt.cur1] || 1} == ExBanking.get_balance(cnt.user2.id, cnt.cur1)
     end
+
+    test ": providing 2 decimals", %{user1: user1, user2: user2, cur1: cur} do
+      actual_balance1 = user1[:balance][cur]
+      actual_balance2 = user2[:balance][cur] || 0
+      {:ok, _, _} = ExBanking.send(user1.id, user2.id, 11.3, cur)
+      {:ok, _, _} = ExBanking.send(user2.id, user1.id, 10.3333333333, cur)
+      {:ok, _, _} = ExBanking.send(user1.id, user2.id, 12.143333, cur)
+      {:ok, _, _} = ExBanking.send(user2.id, user1.id, 10.743333, cur)
+      {:ok, new_balance1, new_balance2} = ExBanking.send(user1.id, user2.id, 12.776335, cur)
+      assert Float.round(actual_balance1 - 11.30 + 10.33 - 12.14 + 10.74 - 12.78, 2) == new_balance1
+      assert Float.round(actual_balance2 + 11.30 - 10.33 + 12.14 - 10.74 + 12.78, 2) == new_balance2
+    end
+  end
+
+  defp make_too_many_requests_to(user) do
+    {:ok, pid} = ExBanking.UserManager.get_pid(user)
+    Enum.each(1..15, fn(_) ->
+      GenServer.cast(pid, :long_duration_request)
+    end)
   end
 end

@@ -20,15 +20,14 @@ defmodule ExBanking do
   Function creates new user in the system
   """
   @spec create_user(user :: String.t()) :: :ok | banking_error
-  def create_user(user) do
-    with {:user_name_valid, true} <- {:user_name_valid, is_binary(user)},
-         {:user_exists, false} <- {:user_not_exist, UserManager.exists?(user)} do
+  def create_user(user) when is_binary(user) do
+    with {:user_exists, false} <- {:user_exists, UserManager.exists?(user)} do
       UserManager.create(user)
     else
-      {:user_name_valid, false} -> :wrong_arguments
       {:user_exists, true} -> :user_already_exists
     end
   end
+  def create_user(_), do: :wrong_arguments
 
   @doc """
   Increases user's balance in given currency by amount value
@@ -36,7 +35,7 @@ defmodule ExBanking do
   """
   @spec deposit(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number} | banking_error
-  def deposit(user, amount, currency), do: transaction(:increase, user, amount, currency)
+  def deposit(user, amount, currency), do: request(:increase, user, amount, currency)
 
   @doc """
   Decreases user's balance in given currency by amount value
@@ -44,14 +43,14 @@ defmodule ExBanking do
   """
   @spec withdraw(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number} | banking_error
-  def withdraw(user, amount, currency), do: transaction(:decrease, user, amount, currency)
+  def withdraw(user, amount, currency), do: request(:decrease, user, amount, currency)
 
   @doc """
   Returns balance of the user in given format
   """
   @spec get_balance(user :: String.t(), currency :: String.t()) ::
           {:ok, balance :: number} | banking_error
-  def get_balance(user, currency), do: transaction(:get, user, 0, currency)
+  def get_balance(user, currency), do: request(:get, user, 0, currency)
 
   @doc """
   Decreases from_user's balance in given currency by amount value
@@ -64,32 +63,30 @@ defmodule ExBanking do
           amount :: number,
           currency :: String.t()
         ) :: {:ok, from_user_balance :: number, to_user_balance :: number} | banking_error
-  def send(from_user, to_user, amount, currency) do
-    with {:param_valid, true} <- {:param_valid, is_binary(from_user)},
-         {:param_valid, true} <- {:param_valid, is_binary(to_user)},
-         # TODO: решить проблему с сотыми
-         {:param_valid, true} <- {:param_valid, is_number(amount) and amount >= 0},
-         {:param_valid, true} <- {:param_valid, is_binary(currency)},
-         {:ok, from_pid} <- UserManager.get_pid(from_user)
-         {:ok, to_pid}   <- UserManager.get_pid(to_user)
-    do
+  def send(from_user, to_user, amount, currency)
+    when is_binary(from_user)
+     and is_binary(to_user)
+     and is_binary(currency)
+     and is_number(amount) and amount >= 0
+  do
+    with {:ok, from_pid} <- UserManager.get_pid(from_user),
+         {:ok, to_pid} <- UserManager.get_pid(to_user) do
       User.transaction(from_pid, {:send, [to_pid, amount, currency]})
     else
-      {:param_valid, false} -> :wrong_arguments
-      {:error, _} -> :user_not_exist
+      {:error, _} -> :user_does_not_exist
+    end
+  end
+  def send(_, _, _, _), do: :wrong_arguments
+
+  defp request(oper, user, amount, currency)
+    when is_binary(user) and is_binary(currency) and is_number(amount) and amount >= 0
+  do
+    with {:ok, pid} <- UserManager.get_pid(user) do
+      User.transaction(pid, {oper, [amount, currency]})
+    else
+      {:error, _} -> :user_does_not_exist
     end
   end
 
-  defp transaction(oper, user, amount, currency) do
-    with {:param_valid, true} <- {:param_valid, is_binary(user)},
-         # TODO: решить проблему с сотыми
-         {:param_valid, true} <- {:param_valid, is_number(amount) and amount >= 0},
-         {:param_valid, true} <- {:param_valid, is_binary(currency)},
-         {:ok, pid} <- UserManager.get_pid(user) do
-      User.transaction(pid, {oper, [amount, currency]})
-    else
-      {:param_valid, false} -> :wrong_arguments
-      {:error, _} -> :user_not_exist
-    end
-  end
+  defp request(_, _, _, _), do: :wrong_arguments
 end

@@ -1,7 +1,7 @@
 defmodule ExBanking.UserManager do
   use Supervisor
 
-  def start_link do
+  def start_link(_) do
     Supervisor.start_link(__MODULE__, :ok, name: __MODULE__)
   end
 
@@ -20,24 +20,24 @@ defmodule ExBanking.UserManager do
   def exists?(user) do
     __MODULE__
     |> Supervisor.which_children()
-    |> Enum.any?(fn({id, _, _, _}) -> id == user end)
+    |> Enum.any?(fn {id, _, _, _} -> id == user end)
   end
 
   @spec get_pid(user :: String.t()) :: {:ok, pid} | {:error, :id_not_exist}
   def get_pid(user) do
     __MODULE__
     |> Supervisor.which_children()
-    |> Enum.find(fn({id, _, _, _}) -> id == user end)
+    |> Enum.find(fn {id, _, _, _} -> id == user end)
     |> case do
       {_, pid, _, _} -> {:ok, pid}
-      nil            -> {:error, :id_not_exist}
+      nil -> {:error, :id_not_exist}
     end
   end
 
   defp user_spec(id) do
     %{
       id: id,
-      start: {MsPP.Entities.Worker, :start_link, [id]},
+      start: {ExBanking.User, :start_link, [id]},
       restart: :transient,
       type: :worker
     }
