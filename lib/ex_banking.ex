@@ -74,9 +74,11 @@ defmodule ExBanking do
          {:ok, to_pid} <- UserManager.get_pid(to_user) do
       User.transaction(from_pid, {:send, [to_pid, amount, currency]})
     else
-      {:error, _} -> :user_does_not_exist
+      {:error, {:user_does_not_exist, ^from_user}} -> :sender_does_not_exist
+      {:error, {:user_does_not_exist, ^to_user}} -> :receiver_does_not_exist
     end
   end
+
   def send(_, _, _, _), do: :wrong_arguments
 
   defp request(oper, user, amount, currency)

@@ -34,7 +34,7 @@ defmodule ExBanking.UserManager do
     |> Enum.find(fn {id, _, _, _} -> id == user end)
     |> case do
       {_, pid, _, _} -> {:ok, pid}
-      nil -> {:error, :id_not_exist}
+      nil -> {:error, {:user_does_not_exist, user}}
     end
   end
 

@@ -22,7 +22,6 @@ defmodule ExBankingTest do
     :ok = ExBanking.create_user(context.user2.id)
     :ok = ExBanking.create_user(context.user3.id)
     :ok = ExBanking.create_user(context.user4.id)
-    context
 
     on_exit(fn ->
       Application.stop(:ex_banking)
@@ -112,6 +111,11 @@ defmodule ExBankingTest do
 
       assert {:ok, actual_balance + 11.30 + 11.33 + 11.14 + 11.74 + 11.78} ==
                ExBanking.deposit(user.id, 11.776336, cur)
+    end
+
+    test "RUB and rub are differrent currency", %{cur1: cur, user1: user} do
+      assert {:ok, user.balance[cur] + 10} == ExBanking.deposit(user.id, 10, cur)
+      assert {:ok, 10} == ExBanking.deposit(user.id, 10, String.upcase(cur))
     end
   end
 
@@ -210,15 +214,15 @@ defmodule ExBankingTest do
     end
 
     test ": want to send amount from not existing user to existing user", cnt do
-      assert :user_does_not_exist == ExBanking.send(cnt.user5.id, cnt.user2.id, 1, cnt.cur1)
+      assert :sender_does_not_exist == ExBanking.send(cnt.user5.id, cnt.user2.id, 1, cnt.cur1)
     end
 
     test ": want to send amount from existing user to not existing user", cnt do
-      assert :user_does_not_exist == ExBanking.send(cnt.user1.id, cnt.user5.id, 1, cnt.cur1)
+      assert :receiver_does_not_exist == ExBanking.send(cnt.user1.id, cnt.user5.id, 1, cnt.cur1)
     end
 
     test ": user and USER are not the same person", cnt do
-      assert :user_does_not_exist ==
+      assert :receiver_does_not_exist ==
                ExBanking.send(cnt.user1.id, String.upcase(cnt.user2.id), 1, cnt.cur1)
     end
 
