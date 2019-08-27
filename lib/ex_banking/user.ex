@@ -6,9 +6,10 @@ defmodule ExBanking.User do
   @message_box_size 10
 
   @spec transaction(user_pid :: pid, {operation :: atom, args :: [any]}) ::
-        result :: atom | {:ok, any} | {:ok, any, any}
+          result :: atom | {:ok, any} | {:ok, any, any}
   def transaction(pid, {oper, args}) do
     {:message_queue_len, message_box} = :erlang.process_info(pid, :message_queue_len)
+
     if message_box < @message_box_size do
       GenServer.call(pid, {oper, args})
     else
@@ -59,15 +60,17 @@ defmodule ExBanking.User do
       e -> {:reply, e, state}
     end
   end
+
   def handle_call(_, _, state), do: {:reply, nil, state}
+
   def handle_cast(:long_duration_request, state) do
     :timer.sleep(150)
     {:noreply, state}
   end
+
   def handle_cast(_, state), do: {:noreply, state}
   def handle_info(_, state), do: {:noreply, state}
 
   defp prepare_balance(balance) when is_float(balance), do: Float.round(balance, @decimals)
   defp prepare_balance(balance) when is_integer(balance), do: prepare_balance(balance * 1.0)
-
 end

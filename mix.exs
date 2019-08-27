@@ -24,7 +24,7 @@ defmodule ExBanking.MixProject do
   defp deps do
     [
       {:credo, "~> 1.1", only: [:dev, :test]},
-      {:excoveralls, "~> 0.10", only: :test},
+      {:excoveralls, "~> 0.10", only: :test}
     ]
   end
 end

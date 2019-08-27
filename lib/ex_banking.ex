@@ -27,6 +27,7 @@ defmodule ExBanking do
       UserManager.create(user)
     end
   end
+
   def create_user(_), do: :wrong_arguments
 
   @doc """
