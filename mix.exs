@@ -24,7 +24,8 @@ defmodule ExBanking.MixProject do
   defp deps do
     [
       {:credo, "~> 1.1", only: [:dev, :test]},
-      {:excoveralls, "~> 0.10", only: :test}
+      {:excoveralls, "~> 0.10", only: :test},
+      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev], runtime: false}
     ]
   end
 end

@@ -8,26 +8,20 @@ defmodule ExBanking.UserManager do
 
   def init(:ok) do
     opts = [strategy: :one_for_one, name: __MODULE__]
-    supervise([], opts)
+    Supervisor.init([], opts)
   end
 
   @doc "Create user"
-  @spec create(user :: String.t()) :: :ok
+  @spec create(user :: String.t()) :: :ok | {:error, :user_already_exists}
   def create(user) do
-    {:ok, _} = Supervisor.start_child(__MODULE__, user_spec(user))
-    :ok
-  end
-
-  @doc "Checks user's existing"
-  @spec exists?(user :: String.t()) :: boolean
-  def exists?(user) do
-    __MODULE__
-    |> Supervisor.which_children()
-    |> Enum.any?(fn {id, _, _, _} -> id == user end)
+    case Supervisor.start_child(__MODULE__, user_spec(user)) do
+      {:ok, _} -> :ok
+      {:error, {:already_started, _}} -> {:error, :user_already_exists}
+    end
   end
 
   @doc "Return user's pid"
-  @spec get_pid(user :: String.t()) :: {:ok, pid} | {:error, :id_not_exist}
+  @spec get_pid(user :: String.t()) :: {:ok, pid} | {:error, {:user_does_not_exist, user :: String.t}}
   def get_pid(user) do
     __MODULE__
     |> Supervisor.which_children()

@@ -20,15 +20,8 @@ defmodule ExBanking do
   Function creates new user in the system
   """
   @spec create_user(user :: String.t()) :: :ok | banking_error
-  def create_user(user) when is_binary(user) do
-    if UserManager.exists?(user) do
-      :user_already_exists
-    else
-      UserManager.create(user)
-    end
-  end
-
-  def create_user(_), do: :wrong_arguments
+  def create_user(user) when is_binary(user), do: UserManager.create(user)
+  def create_user(_), do: {:error, :wrong_arguments}
 
   @doc """
   Increases user's balance in given currency by amount value
@@ -74,21 +67,21 @@ defmodule ExBanking do
          {:ok, to_pid} <- UserManager.get_pid(to_user) do
       User.transaction(from_pid, {:send, [to_pid, amount, currency]})
     else
-      {:error, {:user_does_not_exist, ^from_user}} -> :sender_does_not_exist
-      {:error, {:user_does_not_exist, ^to_user}} -> :receiver_does_not_exist
+      {:error, {:user_does_not_exist, ^from_user}} -> {:error, :sender_does_not_exist}
+      {:error, {:user_does_not_exist, ^to_user}} -> {:error, :receiver_does_not_exist}
     end
   end
 
-  def send(_, _, _, _), do: :wrong_arguments
+  def send(_, _, _, _), do: {:error, :wrong_arguments}
 
   defp request(oper, user, amount, currency)
     when is_binary(user) and is_binary(currency) and is_number(amount) and amount >= 0
   do
     case UserManager.get_pid(user) do
       {:ok, pid} -> User.transaction(pid, {oper, [amount, currency]})
-      _else -> :user_does_not_exist
+      _ -> {:error, :user_does_not_exist}
     end
   end
 
-  defp request(_, _, _, _), do: :wrong_arguments
+  defp request(_, _, _, _), do: {:error, :wrong_arguments}
 end

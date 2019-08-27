@@ -11,15 +11,17 @@ defmodule ExBanking.User do
     {:message_queue_len, message_box} = :erlang.process_info(pid, :message_queue_len)
 
     if message_box < @message_box_size do
-      GenServer.call(pid, {oper, args})
+      # if you standed in queue - stand in it until recieve come for you
+      GenServer.call(pid, {oper, args}, :infinity)
     else
       case oper do
-        :send -> :too_many_requests_to_sender
-        :receive -> :too_many_requests_to_receiver
-        _else -> :too_many_requests_to_user
+        :send -> {:error, :too_many_requests_to_sender}
+        :receive -> {:error, :too_many_requests_to_receiver}
+        _else -> {:error, :too_many_requests_to_user}
       end
     end
   end
+
 
   # -------------------- Internal
 
@@ -40,7 +42,7 @@ defmodule ExBanking.User do
     actual_balance = state[currency] || 0
 
     if state[currency] < amount do
-      {:reply, :not_enough_money, state}
+      {:reply, {:error, :not_enough_money}, state}
     else
       new_balance = prepare_balance(actual_balance - amount)
       {:reply, {:ok, new_balance}, put_in(state[currency], new_balance)}
@@ -52,11 +54,14 @@ defmodule ExBanking.User do
 
   def handle_call({:send, [to_user, amount, cur]}, _from, state) do
     with {:enough_money, true} <- {:enough_money, state[cur] != nil and state[cur] >= amount},
-         {:ok, new_receiver_balance} <- transaction(to_user, {:receive, [amount, cur]}) do
+         {:receiver_is_me, false} <- {:receiver_is_me, self() == to_user},
+         {:ok, new_receiver_balance} <- transaction(to_user, {:receive, [amount, cur]})
+      do
       new_balance = prepare_balance(state[cur] - amount)
       {:reply, {:ok, new_balance, new_receiver_balance}, put_in(state[cur], new_balance)}
     else
-      {:enough_money, false} -> {:reply, :not_enough_money, state}
+      {:enough_money, false} -> {:reply, {:error, :not_enough_money}, state}
+      {:receiver_is_me, true} -> {:reply, {:ok, state[cur], state[cur]}, state}
       e -> {:reply, e, state}
     end
   end
@@ -64,7 +69,7 @@ defmodule ExBanking.User do
   def handle_call(_, _, state), do: {:reply, nil, state}
 
   def handle_cast(:long_duration_request, state) do
-    :timer.sleep(150)
+    :timer.sleep(500)
     {:noreply, state}
   end
 
